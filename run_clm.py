@@ -55,8 +55,9 @@ from transformers.testing_utils import CaptureLogger
 from transformers.trainer_utils import get_last_checkpoint
 from transformers.utils import check_min_version, send_example_telemetry
 from transformers.utils.versions import require_version
+import peft
 from models import misc_utils
-from models import lora_utils
+#from models import lora_utils
 from models import distributed_utils
 from experiments import mmlu_utils
 from experiments import callback_utils
@@ -236,6 +237,23 @@ class DataTrainingArguments:
             if self.validation_file is not None:
                 extension = self.validation_file.split(".")[-1]
                 assert extension in ["csv", "json", "txt"], "`validation_file` should be a csv, a json or a txt file."
+
+
+def save_full_model(trainer: Trainer) -> None:
+    if not isinstance(trainer.model, (PeftModelForCausalLM, PeftModelForSequenceClassification)):
+        raise TypeError(
+            f"Expected `PeftModelForCausalLM`, or "
+            f"`PeftModelForSequenceClassification`, "
+            f"but got {type(trainer.model)}")
+    if not trainer.args.should_save:
+        return
+
+    state_dict = trainer.model.state_dict()
+    file_name = os.path.join(
+        trainer.args.output_dir,
+        "full_model.pth")
+    torch.save(state_dict, file_name)
+    click.secho(f"Saved model state dict to {file_name}", fg="green")
 
 
 def main(return_trainer: bool = False):
@@ -522,9 +540,9 @@ def main(return_trainer: bool = False):
             if model_args.torch_dtype in ["auto", None]
             else getattr(torch, model_args.torch_dtype)
         )
-        hf_quantization_kwargs = lora_utils.get_hf_quantization_config(
-            method=model_args.hf_quantization_method,
-            sequence_length=data_args.block_size)
+        #hf_quantization_kwargs = lora_utils.get_hf_quantization_config(
+        #    method=model_args.hf_quantization_method,
+        #    sequence_length=data_args.block_size)
         model = AutoModelForCausalLM.from_pretrained(
             model_args.model_name_or_path,
             from_tf=bool(".ckpt" in model_args.model_name_or_path),
@@ -534,7 +552,8 @@ def main(return_trainer: bool = False):
             use_auth_token=True if model_args.use_auth_token else None,
             torch_dtype=torch_dtype,
             low_cpu_mem_usage=model_args.low_cpu_mem_usage,
-            **hf_quantization_kwargs)
+        )
+        #    **hf_quantization_kwargs)
         # https://github.com/huggingface/transformers/pull/24906
         if model.config.pretraining_tp != 1:
             raise NotImplementedError
@@ -677,7 +696,8 @@ def main(return_trainer: bool = False):
             preds = preds[:, :-1].reshape(-1)
             return metric.compute(predictions=preds, references=labels)
 
-    if model_args.lora_config in ["lora", "lora-lpq"]:
+    if model_args.lora_config in ["lora"]:
+        """
         click.secho(f"LoRA Finetuning with `{model_args.lora_config}`", bg="yellow")
         if not all([
             model_args.lora_config is not None,
@@ -696,7 +716,7 @@ def main(return_trainer: bool = False):
             model_name=model_args.lora_model_name,
             device="cuda")
 
-    elif model_args.lora_config in ["lora-gptq"]:
+        elif model_args.lora_config in ["lora-gptq"]:
         click.secho(f"GPTQ-LoRA Finetuning with `{model_args.lora_config}`", bg="yellow")
         if not all([
             model_args.lora_config is not None,
@@ -709,6 +729,18 @@ def main(return_trainer: bool = False):
             num_ranks=model_args.lora_num_ranks,
             lora_dropout=model_args.lora_dropout,
             use_gradient_checkpointing=training_args.gradient_checkpointing)
+        """
+        target_modules = ["q_proj", "k_proj", "v_proj", "o_proj", "up_proj", "down_proj", "gate_proj"]
+        lora_config = peft.LoraConfig(
+            task_type=peft.TaskType.CAUSAL_LM,
+            inference_mode=False,
+            r=model_args.lora_num_ranks,
+            lora_alpha=16,
+            lora_dropout=0.1,
+            target_modules=target_modules,
+            init_lora_weights=True,
+        )
+        model = peft.get_peft_model(model, lora_config)
 
     else:
         click.secho(f"Full Finetuning", bg="yellow")
@@ -768,7 +800,8 @@ def main(return_trainer: bool = False):
         trainer.save_state()
 
         # Save the full model
-        lora_utils.save_full_model(trainer)
+        #lora_utils.save_full_model(trainer)
+        save_full_model(trainer)
 
     # Evaluation
     if training_args.do_eval:
