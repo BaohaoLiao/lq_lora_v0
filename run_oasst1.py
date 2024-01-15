@@ -20,10 +20,11 @@ from transformers import (
     AutoModelForCausalLM,
     Seq2SeqTrainer,
     LlamaTokenizer)
+import peft
 from peft import PeftModelForCausalLM
 from peft.tuners.lora import LoraLayer
 
-from models import lora_utils
+#from models import lora_utils
 from experiments import vicuna_utils
 from experiments import callback_utils
 from experiments.qlora import (
@@ -58,17 +59,17 @@ def get_accelerate_model(args: argparse.Namespace) -> Tuple[PeftModelForCausalLM
         raise NotImplementedError
 
     print(f"loading base model {args.model_name_or_path}...")
-    hf_quantization_kwargs = lora_utils.get_hf_quantization_config(
-        method=args.hf_quantization_method,
-        sequence_length=SEQUENCE_LENGTH)
+    #hf_quantization_kwargs = lora_utils.get_hf_quantization_config(
+    #    method=args.hf_quantization_method,
+    #    sequence_length=SEQUENCE_LENGTH)
     model = AutoModelForCausalLM.from_pretrained(
         args.model_name_or_path,
         cache_dir=args.cache_dir,
         trust_remote_code=args.trust_remote_code,
         use_auth_token=args.use_auth_token,
         torch_dtype=None,
-        low_cpu_mem_usage=True,
-        **hf_quantization_kwargs)
+        low_cpu_mem_usage=True,)
+    #    **hf_quantization_kwargs)
     # https://github.com/huggingface/transformers/pull/24906
     if model.config.pretraining_tp != 1:
         raise NotImplementedError
@@ -108,6 +109,7 @@ def get_accelerate_model(args: argparse.Namespace) -> Tuple[PeftModelForCausalLM
 
     if args.lora_config in ["lora", "lora-lpq"]:
         click.secho(f"LoRA Finetuning with `{args.lora_config}`", bg="yellow")
+        """
         if not all([
             args.lora_config is not None,
             args.lora_model_name is not None,
@@ -126,7 +128,7 @@ def get_accelerate_model(args: argparse.Namespace) -> Tuple[PeftModelForCausalLM
             model_name=args.lora_model_name,
             device="cuda")
 
-    elif args.lora_config in ["lora-gptq"]:
+        elif args.lora_config in ["lora-gptq"]:
         click.secho(f"GPTQ-LoRA Finetuning with `{args.lora_config}`", bg="yellow")
         if not all([
             args.lora_config is not None,
@@ -141,7 +143,7 @@ def get_accelerate_model(args: argparse.Namespace) -> Tuple[PeftModelForCausalLM
             lora_dropout=args.lora_dropout,
             use_gradient_checkpointing=args.gradient_checkpointing)
 
-    elif os.path.isdir(args.lora_config):
+        elif os.path.isdir(args.lora_config):
         click.secho(f"Continued LoRA Finetuning from `{args.lora_config}`", bg="yellow")
         if not all([
             args.lora_config is not None,
@@ -159,6 +161,18 @@ def get_accelerate_model(args: argparse.Namespace) -> Tuple[PeftModelForCausalLM
             use_gradient_checkpointing=args.gradient_checkpointing,
             checkpoint_dir=args.lora_config,
             checkpoint_preprocess_embedding=True)
+        """
+        target_modules = ["q_proj", "k_proj", "v_proj", "o_proj", "up_proj", "down_proj", "gate_proj"]
+        lora_config = peft.LoraConfig(
+            task_type=peft.TaskType.CAUSAL_LM,
+            inference_mode=False,
+            r=model_args.lora_num_ranks,
+            lora_alpha=16,
+            lora_dropout=0.1,
+            target_modules=target_modules,
+            init_lora_weights=True,
+        )
+        model = peft.get_peft_model(model, lora_config)
 
     else:
         click.secho(f"Full Finetuning", bg="yellow")

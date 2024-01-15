@@ -696,9 +696,9 @@ def main(return_trainer: bool = False):
             preds = preds[:, :-1].reshape(-1)
             return metric.compute(predictions=preds, references=labels)
 
-    if model_args.lora_config in ["lora"]:
-        """
+    if model_args.lora_config in ["lora", "lora-lpq"]:
         click.secho(f"LoRA Finetuning with `{model_args.lora_config}`", bg="yellow")
+        """
         if not all([
             model_args.lora_config is not None,
             model_args.lora_model_name is not None,
