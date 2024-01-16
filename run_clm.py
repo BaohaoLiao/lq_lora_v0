@@ -332,7 +332,6 @@ def main(return_trainer: bool = False):
             bg="yellow")
         raw_datasets = load_dataset(
             "allenai/c4",
-            "allenai--c4",
             data_files={
                 "train": "en/c4-train.00000-of-01024.json.gz",
                 "validation": "en/c4-validation.00000-of-00008.json.gz",
