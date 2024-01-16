@@ -815,8 +815,8 @@ def main(return_trainer: bool = False):
     if training_args.do_eval:
         logger.info("*** Evaluate ***")
 
-        if data_args.max_eval_samples is not None:
-            raise NotImplementedError
+        #if data_args.max_eval_samples is not None:
+        #    raise NotImplementedError
 
         if isinstance(trainer.eval_dataset, dict):
             metrics = {}
