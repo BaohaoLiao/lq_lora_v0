@@ -47,6 +47,8 @@ def _run_evaluation(
         })
         # mmlu_dataset = mmlu_dataset.remove_columns("subject")
     mmlu_dataset = mmlu_dataset[mmlu_split]
+
+
     if max_mmlu_samples is not None:
         mmlu_dataset = mmlu_dataset.select(range(max_mmlu_samples))
     abcd_idx = [
