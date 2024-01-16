@@ -454,6 +454,7 @@ class DataCollatorForCausalLM(object):
 
     def __call__(self, instances: Sequence[Dict]) -> Dict[str, torch.Tensor]:
         # Extract elements
+        print("!!!!!!!!!!!!!!")
         for example in instances:
             print(example)
 
