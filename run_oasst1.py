@@ -43,7 +43,7 @@ from experiments.qlora import (
 
 # This number is set so that it's consistent with other experiments.
 SEQUENCE_LENGTH = 1024
-MMLU_DATA_BASE_DIR = "/export/share/experiments/20230903/qlora/"
+MMLU_DATA_BASE_DIR = "/ivi/ilps/personal/bliao/qlora/08_c4"
 
 
 @dataclasses.dataclass
