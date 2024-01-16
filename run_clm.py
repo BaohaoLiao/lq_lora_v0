@@ -241,7 +241,7 @@ class DataTrainingArguments:
 
 
 def save_full_model(trainer: Trainer) -> None:
-    if not isinstance(trainer.model, (PeftModelForCausalLM, PeftModelForSequenceClassification)):
+    if not isinstance(trainer.model, (peft.PeftModelForCausalLM, peft.PeftModelForSequenceClassification)):
         raise TypeError(
             f"Expected `PeftModelForCausalLM`, or "
             f"`PeftModelForSequenceClassification`, "
