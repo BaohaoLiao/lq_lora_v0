@@ -406,7 +406,7 @@ def main(return_trainer: bool = False):
         assert data_args.cached_file is not None, "Please specify the cached data file"
         if os.path.exists(data_args.cached_file):
             logging.info(f"Loading calibration data from {data_args.cached_file} ...")
-            raw_datasets = load_from_disk(data_args.cached_file)
+            raw_datasets = datasets.load_from_disk(data_args.cached_file)
         else:
             misc_utils.swarn(
                 f"Using C4 dataset (`dataset_name` "
