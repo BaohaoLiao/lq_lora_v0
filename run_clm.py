@@ -223,6 +223,7 @@ class DataTrainingArguments:
     keep_linebreaks: bool = field(
         default=True, metadata={"help": "Whether to keep line breaks when using TXT files or not."}
     )
+    cached_file: str = field(default=None, metadata={"help": "Cached tokenized data."})
 
     def __post_init__(self):
         if self.streaming:
@@ -402,41 +403,49 @@ def main(return_trainer: bool = False):
     # In distributed training, the load_dataset function guarantee that only one local process can concurrently
     # download the dataset.
     if data_args.dataset_name == "c4":
-        misc_utils.swarn(
-            f"Using C4 dataset (`dataset_name` "
-            f"= {data_args.dataset_name})",
-            bg="yellow")
-        raw_datasets = load_dataset(
-            "allenai/c4",
-            data_files={
-                "train": "en/c4-train.00000-of-01024.json.gz",
-                "validation": "en/c4-validation.00000-of-00008.json.gz",
-            },
-        )
-        _wikitext_dataset = load_dataset(
-            "wikitext",
-            "wikitext-2-raw-v1",
-            split="test")
-        # Hacks to be consistent with other works' preprocessing.
-        wikitext_dataset = datasets.Dataset.from_dict(
-            {
-                "text": [
-                    # https://github.com/IST-DASLab/gptq/blob/main/datautils.py#L10
-                    "\n\n".join(_wikitext_dataset["text"])
-                ],
-            },
-        )
-        # Hacks to get around the `remove_columns` to be used later.
-        wikitext_dataset = (
-            wikitext_dataset  # type: ignore
-            .add_column(
-                name="timestamp",
-                column=wikitext_dataset["text"])
-            .add_column(
-                name="url",
-                column=wikitext_dataset["text"])
-        )
-        raw_datasets["wikitext"] = wikitext_dataset
+        assert data_args.cached_file is not None, "Please specify the cached data file"
+        if os.path.exists(data_args.cached_file):
+            logging.info(f"Loading calibration data from {data_args.cached_file} ...")
+            raw_datasets = load_from_disk(data_args.cached_file)
+        else:
+            misc_utils.swarn(
+                f"Using C4 dataset (`dataset_name` "
+                f"= {data_args.dataset_name})",
+                bg="yellow")
+            raw_datasets = load_dataset(
+                "allenai/c4",
+                data_files={
+                    "train": "en/c4-train.00000-of-01024.json.gz",
+                    "validation": "en/c4-validation.00000-of-00008.json.gz",
+                },
+            )
+            _wikitext_dataset = load_dataset(
+                "wikitext",
+                "wikitext-2-raw-v1",
+                split="test")
+            # Hacks to be consistent with other works' preprocessing.
+            wikitext_dataset = datasets.Dataset.from_dict(
+                {
+                    "text": [
+                        # https://github.com/IST-DASLab/gptq/blob/main/datautils.py#L10
+                        "\n\n".join(_wikitext_dataset["text"])
+                    ],
+                },
+            )
+            # Hacks to get around the `remove_columns` to be used later.
+            wikitext_dataset = (
+                wikitext_dataset  # type: ignore
+                .add_column(
+                    name="timestamp",
+                    column=wikitext_dataset["text"])
+                .add_column(
+                    name="url",
+                    column=wikitext_dataset["text"])
+            )
+            raw_datasets["wikitext"] = wikitext_dataset
+
+            raw_datasets.save_to_disk(data_args.cached_file)
+
     elif data_args.dataset_name == "c4-wiki-large":
         misc_utils.swarn(
             f"Using C4+WikiText2 dataset (`dataset_name` "
