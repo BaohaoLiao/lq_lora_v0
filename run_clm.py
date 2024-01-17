@@ -89,6 +89,10 @@ class ModelArguments:
             )
         },
     )
+    adapter_name_or_path: Optional[str] = field(
+        default=None,
+        metadata={"help": "Path to the LoRA adapter. Used in evaluation or resuming from the checkpoint."},
+    )
     model_type: Optional[str] = field(
         default=None,
         metadata={"help": "If training from scratch, pass a model type from the list: " + ", ".join(MODEL_TYPES)},
@@ -705,7 +709,6 @@ def main(return_trainer: bool = False):
             return metric.compute(predictions=preds, references=labels)
 
     if model_args.lora_config in ["lora", "lora-lpq"]:
-        click.secho(f"LoRA Finetuning with `{model_args.lora_config}`", bg="yellow")
         """
         if not all([
             model_args.lora_config is not None,
@@ -738,17 +741,26 @@ def main(return_trainer: bool = False):
             lora_dropout=model_args.lora_dropout,
             use_gradient_checkpointing=training_args.gradient_checkpointing)
         """
-        target_modules = ["q_proj", "k_proj", "v_proj", "o_proj", "up_proj", "down_proj", "gate_proj"]
-        lora_config = peft.LoraConfig(
-            task_type=peft.TaskType.CAUSAL_LM,
-            inference_mode=False,
-            r=model_args.lora_num_ranks,
-            lora_alpha=16,
-            lora_dropout=0.1,
-            target_modules=target_modules,
-            init_lora_weights=True,
-        )
-        model = peft.get_peft_model(model, lora_config)
+        if model_args.adapter_name_or_path is not None:
+            click.secho(f"ActLoftQ Finetuning with `{model_args.lora_config}`", bg="yellow")
+            model = PeftModel.from_pretrained(
+                model,
+                model_args.adapter_name_or_path,
+                is_trainable=True,
+            )
+        else:
+            click.secho(f"LoRA Finetuning with `{model_args.lora_config}`", bg="yellow")
+            target_modules = ["q_proj", "k_proj", "v_proj", "o_proj", "up_proj", "down_proj", "gate_proj"]
+            lora_config = peft.LoraConfig(
+                task_type=peft.TaskType.CAUSAL_LM,
+                inference_mode=False,
+                r=model_args.lora_num_ranks,
+                lora_alpha=16,
+                lora_dropout=0.1,
+                target_modules=target_modules,
+                init_lora_weights=True,
+            )
+            model = peft.get_peft_model(model, lora_config)
 
     else:
         click.secho(f"Full Finetuning", bg="yellow")
