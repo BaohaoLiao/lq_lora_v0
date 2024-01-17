@@ -743,7 +743,7 @@ def main(return_trainer: bool = False):
         """
         if model_args.adapter_name_or_path is not None:
             click.secho(f"ActLoftQ Finetuning with `{model_args.lora_config}`", bg="yellow")
-            model = PeftModel.from_pretrained(
+            model = peft.PeftModel.from_pretrained(
                 model,
                 model_args.adapter_name_or_path,
                 is_trainable=True,
